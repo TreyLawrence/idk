@@ -1,74 +1,82 @@
-var system, video;
+var system, video, img;
 
-var vScale = 4;
-var img_u8 = new jsfeat.matrix_t(640, 480, jsfeat.U8C1_t);
+var vidScale = 1;
+var painterSize = 6;
+var numPainters = 512;
+var speed = 10;
 
 function setup() {
-  //createCanvas(window.innerWidth, window.innerHeight);
   createCanvas(640, 480);
   pixelDensity(1);
+  noStroke();
+
   video = createCapture(VIDEO);
-  video.size(width/vScale, height/vScale);
-  system = new ParticleSystem();
-  for (var i = 0; i < 640; i += 12) {
-    for (var j = 0; j < 480; j += 12) {
-      system.addParticle(i, j);
+  video.size(width/vidScale, height/vidScale);
+  video.style('display', 'none');
+  img = new jsfeat.matrix_t(width/vidScale, height/vidScale, jsfeat.U8C1_t);
+
+
+  system = new PainterSystem();
+  for (var i = 0; i < width; i += painterSize*4) {
+    for (var j = 0; j < height; j += painterSize*4) {
+      system.addPainter(i, j);
     }
   }
 }
 
 function draw() {
-  background('black');
   video.loadPixels();
-  jsfeat.imgproc.grayscale(video.pixels, 640, 480, img_u8);
-  jsfeat.imgproc.gaussian_blur(img_u8, img_u8, 6, 0);
-  jsfeat.imgproc.canny(img_u8, img_u8, 20, 50);
-  loadPixels();
-  updatePixels();
   system.run();
 }
 
-// A simple Particle class
-var Particle = function(position) {
-  var x = random(-1, 1), y = random(-1, 1);
-  this.velocity = createVector(x, y);
+// A simple Painter class
+var Painter = function(position) {
+  this.velocity = createVector(random(-1, 1), random(-1, 1));
   this.position = position.copy();
 };
 
-Particle.prototype.run = function() {
+Painter.prototype.run = function() {
   this.update();
   this.display();
 };
 
 // Method to update position
-Particle.prototype.update = function(){
-  this.position.add(this.velocity);
+Painter.prototype.update = function(){
+  this.position.add(p5.Vector.mult(this.velocity, speed));
+  if (this.position.x < 0) {
+    this.position.x = -this.position.x;
+    this.velocity.x = -this.velocity.x;
+  } else if (this.position.x > width) {
+    this.position.x = 2*width - this.position.x;
+    this.velocity.x = -this.velocity.x
+  }
+
+  if (this.position.y < 0) {
+    this.position.y = -this.position.y;
+    this.velocity.y = -this.velocity.y;
+  } else if (this.position.y > height) {
+    this.position.y = 2*height - this.position.y;
+    this.velocity.y = -this.velocity.y;
+  }
 };
 
 // Method to display
-Particle.prototype.display = function() {
-  rgb = video.get(floor(this.position.x/vScale), floor(this.position.y/vScale));
-  fill(rgb[0], rgb[1], rgb[2], 150);
-  ellipse(this.position.x, this.position.y, 6, 6);
+Painter.prototype.display = function() {
+  rgb = video.get(floor(this.position.x/vidScale), floor(this.position.y/vidScale));
+  fill(rgb[0], rgb[1], rgb[2], 200);
+  ellipse(this.position.x, this.position.y, painterSize, painterSize);
 };
 
-// Is the particle still useful?
-Particle.prototype.isDead = function(){
-  var x = this.position.x, y = this.position.y;
-  return x < 0 || x > width || y <= 0 || y > height;
+var PainterSystem = function() {
+  this.painters = [];
 };
 
-var ParticleSystem = function() {
-  this.particles = [];
+PainterSystem.prototype.addPainter = function(x, y) {
+  this.painters.push(new Painter(createVector(x, y)));
 };
 
-ParticleSystem.prototype.addParticle = function(x, y) {
-  this.particles.push(new Particle(createVector(x, y)));
-};
-
-ParticleSystem.prototype.run = function() {
-  for (var i = this.particles.length-1; i >= 0; i--) {
-    var p = this.particles[i];
-    p.run();
+PainterSystem.prototype.run = function() {
+  for (var i = this.painters.length-1; i >= 0; i--) {
+    this.painters[i].run();
   }
 };
